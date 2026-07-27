@@ -71,12 +71,21 @@ const Sync = (() => {
     sha = json.content.sha;
   }
 
+  // Photos are deliberately excluded — base64 images would blow past the
+  // GitHub Contents API's ~1MB payload limit and bloat commit history.
+  // They stay local-only (still included in manual Export/Import backups).
+  function syncPayload() {
+    const data = Store.exportAll();
+    delete data[Store.KEYS.photoLog];
+    return data;
+  }
+
   async function flush() {
     if (!isConnected() || syncing) return;
     syncing = true;
     window.dispatchEvent(new CustomEvent("sync-start"));
     try {
-      await push(Store.exportAll());
+      await push(syncPayload());
       window.dispatchEvent(new CustomEvent("sync-done"));
     } catch (e) {
       window.dispatchEvent(new CustomEvent("sync-error", { detail: e.message }));
@@ -106,7 +115,7 @@ const Sync = (() => {
       if (remote) {
         Store.importAll(remote);
       } else {
-        await push(Store.exportAll()); // first-time: seed the remote file
+        await push(syncPayload()); // first-time: seed the remote file
       }
       return true;
     } catch (e) {

@@ -7,7 +7,8 @@ const Store = (() => {
     supplements: "att_supplements",
     supplementLog: "att_supplement_log",   // { "YYYY-MM-DD": ["s1","s4",...] }
     trainingLog: "att_training_log",       // { "YYYY-MM-DD": { exercises: {id:true}, dayDone: true } }
-    trackingEntries: "att_tracking_entries" // [ {id,date,weight,bicepL,bicepR,waist,notes} ]
+    trackingEntries: "att_tracking_entries", // [ {id,date,weight,bicepL,bicepR,waist,notes} ]
+    photoLog: "att_photo_log"               // [ {id,date,dataUrl,note} ] — local-only, see note on addPhoto
   };
 
   let suppressSync = false;
@@ -30,6 +31,7 @@ const Store = (() => {
     if (!localStorage.getItem(KEYS.supplementLog)) set(KEYS.supplementLog, {});
     if (!localStorage.getItem(KEYS.trainingLog)) set(KEYS.trainingLog, {});
     if (!localStorage.getItem(KEYS.trackingEntries)) set(KEYS.trackingEntries, []);
+    if (!localStorage.getItem(KEYS.photoLog)) set(KEYS.photoLog, []);
   }
 
   // ---- Groceries ----
@@ -87,6 +89,31 @@ const Store = (() => {
     log[dateStr].dayDone = done;
     set(KEYS.trainingLog, log);
   }
+  function setExerciseDone(dateStr, exId, done) {
+    const log = getTrainingLog();
+    log[dateStr] = log[dateStr] || { exercises: {}, dayDone: false };
+    log[dateStr].exercises[exId] = done;
+    set(KEYS.trainingLog, log);
+  }
+  // Logs the working weight/reps used for an exercise on a given day —
+  // one entry per exercise per day (the top set), not a full per-set log.
+  function logExerciseSet(dateStr, exId, weight, reps) {
+    const log = getTrainingLog();
+    log[dateStr] = log[dateStr] || { exercises: {}, dayDone: false };
+    log[dateStr].sets = log[dateStr].sets || {};
+    log[dateStr].sets[exId] = { weight, reps };
+    set(KEYS.trainingLog, log);
+  }
+  // Most recent logged weight/reps for this exercise before (not on) the given date.
+  function getLastExerciseSet(exId, beforeDateStr) {
+    const log = getTrainingLog();
+    const dates = Object.keys(log)
+      .filter(d => d < beforeDateStr && log[d].sets && log[d].sets[exId])
+      .sort();
+    if (!dates.length) return null;
+    const last = dates[dates.length - 1];
+    return { date: last, ...log[last].sets[exId] };
+  }
 
   // ---- Tracking ----
   const getTrackingEntries = () => get(KEYS.trackingEntries, []).sort((a,b) => a.date < b.date ? 1 : -1);
@@ -100,6 +127,25 @@ const Store = (() => {
   }
   function deleteTrackingEntry(id) {
     set(KEYS.trackingEntries, get(KEYS.trackingEntries, []).filter(e => e.id !== id));
+  }
+
+  // ---- Progress photos ----
+  // Deliberately excluded from cloud sync (see js/sync.js) — base64 photos would
+  // blow past the GitHub Contents API's ~1MB payload limit and bloat commit
+  // history. They're local-only, but included in manual Export/Import backups.
+  const getPhotos = () => get(KEYS.photoLog, []).sort((a, b) => a.date < b.date ? 1 : -1);
+  function addPhoto(photo) {
+    suppressSync = true;
+    const list = get(KEYS.photoLog, []);
+    photo.id = "p" + Date.now();
+    list.push(photo);
+    set(KEYS.photoLog, list);
+    suppressSync = false;
+  }
+  function deletePhoto(id) {
+    suppressSync = true;
+    set(KEYS.photoLog, get(KEYS.photoLog, []).filter(p => p.id !== id));
+    suppressSync = false;
   }
 
   // ---- Export / Import ----
@@ -126,8 +172,9 @@ const Store = (() => {
     getGroceries, saveGroceries, addGrocery, logPrice, deleteGrocery,
     getRecipes,
     getSupplements, getSupplementLog, toggleSupplement,
-    getTrainingLog, toggleExercise, setDayDone,
+    getTrainingLog, toggleExercise, setDayDone, setExerciseDone, logExerciseSet, getLastExerciseSet,
     getTrackingEntries, addTrackingEntry, deleteTrackingEntry,
+    getPhotos, addPhoto, deletePhoto,
     exportAll, importAll, clearAllData
   };
 })();

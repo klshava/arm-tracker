@@ -46,6 +46,12 @@ function showSetup() {
   document.getElementById("lock-verify").classList.add("hidden");
   const secret = Auth.generateSecret();
   document.getElementById("secret-display").textContent = secret;
+  const qrEl = document.getElementById("qr-code");
+  qrEl.innerHTML = "";
+  if (window.QRCode) {
+    const uri = `otpauth://totp/Arms%20Tracker?secret=${secret}&issuer=Arms%20Tracker&algorithm=SHA1&digits=6&period=30`;
+    new QRCode(qrEl, { text: uri, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
+  }
   document.getElementById("btn-copy-secret").addEventListener("click", () => {
     navigator.clipboard.writeText(secret).then(() => toast("Key copied"));
   });
@@ -308,11 +314,14 @@ VIEW_RENDERERS.training = function renderTraining() {
       </div>
       <div class="day-exercises${isToday ? " open" : ""}" id="ex-${dateStr}">
         ${isRest ? `<p class="card-sub">Rest day — light walk or stretch if you feel like it.</p>` :
-          program.exercises.map(ex => `<div class="check-row">
+          program.exercises.map(ex => {
+            const loggedSet = dayLog.sets && dayLog.sets[ex.id];
+            return `<div class="check-row">
             <div class="checkbox ${dayLog.exercises[ex.id] ? "checked" : ""}" data-toggle-ex="${dateStr}|${ex.id}">${dayLog.exercises[ex.id] ? "✓" : ""}</div>
-            <div class="check-row-text ${dayLog.exercises[ex.id] ? "done" : ""}">${escapeHtml(ex.name)}<div class="sub">${ex.sets}</div></div>
-            <button class="guide-btn" type="button" data-guide="${escapeHtml(ex.name)}" aria-label="How to do this exercise">ⓘ</button>
-          </div>`).join("")}
+            <div class="check-row-text ${dayLog.exercises[ex.id] ? "done" : ""}">${escapeHtml(ex.name)}<div class="sub">${ex.sets}${loggedSet ? ` · logged ${loggedSet.weight}kg × ${loggedSet.reps}` : ""}</div></div>
+            <button class="guide-btn" type="button" data-guide="${escapeHtml(ex.name)}" data-guide-date="${dateStr}" data-guide-exid="${ex.id}" aria-label="How to do this exercise">ⓘ</button>
+          </div>`;
+          }).join("")}
       </div>
     </div>`;
   });
@@ -331,14 +340,37 @@ VIEW_RENDERERS.training = function renderTraining() {
   }));
   el.querySelectorAll("[data-guide]").forEach(btn => btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    showExerciseGuide(btn.dataset.guide);
+    showExerciseGuide(btn.dataset.guide, btn.dataset.guideDate, btn.dataset.guideExid);
   }));
 };
 
-function showExerciseGuide(name) {
+function formatShortDate(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+    osc.onended = () => ctx.close();
+  } catch (e) { /* Web Audio unavailable — silently skip the beep */ }
+}
+
+function showExerciseGuide(name, dateStr, exId) {
   const guide = EXERCISE_GUIDES[name];
   if (!guide) { toast("No guide for this one yet"); return; }
   const svg = PATTERN_SVGS[guide.pattern] || "";
+  const hasLogContext = !!(dateStr && exId);
+  const lastSet = hasLogContext ? Store.getLastExerciseSet(exId, dateStr) : null;
+  const todaySet = hasLogContext ? (Store.getTrainingLog()[dateStr]?.sets || {})[exId] : null;
+
   const html = `
     <div class="guide-svg-wrap">${svg}</div>
     <p class="guide-muscles">${escapeHtml(guide.muscles)}</p>
@@ -351,10 +383,81 @@ function showExerciseGuide(name) {
       <ul>${guide.cues.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
     </div>
     <div class="guide-tip">💡 ${escapeHtml(guide.tip)}</div>
+    ${hasLogContext ? `
+    <div class="guide-block">
+      <h3>Log today's set</h3>
+      <p class="card-sub">${lastSet ? `Last time (${formatShortDate(lastSet.date)}): ${lastSet.weight}kg × ${lastSet.reps}` : "No previous log yet — this'll be your baseline."}</p>
+      <div class="field-row">
+        <div class="field"><label>Weight (kg)</label><input type="number" step="0.5" min="0" id="glog-weight" value="${todaySet ? todaySet.weight : ""}" placeholder="${lastSet ? lastSet.weight : "0"}"></div>
+        <div class="field"><label>Reps</label><input type="number" step="1" min="0" id="glog-reps" value="${todaySet ? todaySet.reps : ""}" placeholder="${lastSet ? lastSet.reps : "0"}"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-save-set">Save set</button>
+    </div>` : ""}
+    <div class="guide-block">
+      <h3>Rest timer</h3>
+      <div class="timer-display" id="timer-display">90</div>
+      <div class="timer-presets">
+        <button class="btn btn-secondary timer-preset" type="button" data-secs="60">60s</button>
+        <button class="btn btn-secondary timer-preset active" type="button" data-secs="90">90s</button>
+        <button class="btn btn-secondary timer-preset" type="button" data-secs="120">120s</button>
+      </div>
+      <button class="btn btn-primary" id="btn-timer-toggle" type="button">Start</button>
+    </div>
     <button class="btn btn-secondary" id="btn-close-guide" style="margin-top:16px">Close</button>
   `;
   const sheet = openSheet(name, html);
   sheet.querySelector("#btn-close-guide").addEventListener("click", () => closeSheet(sheet));
+
+  if (hasLogContext) {
+    sheet.querySelector("#btn-save-set").addEventListener("click", () => {
+      const weight = parseFloat(sheet.querySelector("#glog-weight").value);
+      const reps = parseInt(sheet.querySelector("#glog-reps").value, 10);
+      if (!weight || !reps) { toast("Enter weight and reps first"); return; }
+      Store.logExerciseSet(dateStr, exId, weight, reps);
+      Store.setExerciseDone(dateStr, exId, true);
+      toast("Set logged");
+      closeSheet(sheet);
+      VIEW_RENDERERS.training();
+    });
+  }
+
+  // ---- Rest timer ----
+  let timerDuration = 90;
+  let timerRemaining = 90;
+  let timerRunning = false;
+  let timerInterval = null;
+  const display = sheet.querySelector("#timer-display");
+  const toggleBtn = sheet.querySelector("#btn-timer-toggle");
+  sheet.querySelectorAll(".timer-preset").forEach(btn => btn.addEventListener("click", () => {
+    if (timerRunning) return;
+    sheet.querySelectorAll(".timer-preset").forEach(b => b.classList.toggle("active", b === btn));
+    timerDuration = timerRemaining = parseInt(btn.dataset.secs, 10);
+    display.textContent = timerRemaining;
+  }));
+  toggleBtn.addEventListener("click", () => {
+    if (timerRunning) {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      toggleBtn.textContent = "Start";
+      return;
+    }
+    if (timerRemaining <= 0) timerRemaining = timerDuration;
+    timerRunning = true;
+    toggleBtn.textContent = "Pause";
+    timerInterval = setInterval(() => {
+      if (!document.body.contains(display)) { clearInterval(timerInterval); return; }
+      timerRemaining--;
+      display.textContent = timerRemaining;
+      if (timerRemaining <= 0) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        toggleBtn.textContent = "Start";
+        playBeep();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        toast("Rest done — go again 💪");
+      }
+    }, 1000);
+  });
 }
 
 /* ============ RECIPES ============ */
@@ -450,6 +553,11 @@ VIEW_RENDERERS.tracking = function renderTracking() {
     <div class="chart-wrap"><canvas id="tk-chart" height="220"></canvas></div>
     <div class="section-label">History</div>
     <div class="list-group" id="tk-history"></div>
+    <div class="section-label">Progress photos</div>
+    <p class="card-sub" style="margin:0 4px 10px">Stored on this device only — not part of cloud sync — but included in Export all data backups.</p>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" class="hidden">
+    <div class="photo-grid" id="photo-grid"></div>
+    <button class="btn btn-secondary" id="btn-add-photo" style="margin-top:10px">+ Add photo</button>
   `;
   document.getElementById("btn-save-tracking").addEventListener("click", () => {
     const weight = parseFloat(document.getElementById("tk-weight").value);
@@ -467,7 +575,78 @@ VIEW_RENDERERS.tracking = function renderTracking() {
   });
   renderTrackingHistory(entries);
   renderTrackingChart(entries);
+  renderPhotoGrid();
+  document.getElementById("btn-add-photo").addEventListener("click", () => {
+    document.getElementById("photo-input").click();
+  });
+  document.getElementById("photo-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageFile(file);
+      Store.addPhoto({ date: todayStr(), dataUrl, note: "" });
+      toast("Photo added");
+      renderPhotoGrid();
+    } catch (err) {
+      toast("Couldn't save that photo — try a smaller image");
+    }
+    e.target.value = "";
+  });
 };
+
+function resizeImageFile(file, maxDim = 1000, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoGrid() {
+  const grid = document.getElementById("photo-grid");
+  const photos = Store.getPhotos();
+  if (!photos.length) {
+    grid.innerHTML = `<p class="card-sub" style="grid-column:1/-1">No progress photos yet.</p>`;
+    return;
+  }
+  grid.innerHTML = photos.map(p => `<div class="photo-cell" data-photo-id="${p.id}" style="background-image:url('${p.dataUrl}')"><span class="photo-cell-date">${formatShortDate(p.date)}</span></div>`).join("");
+  grid.querySelectorAll("[data-photo-id]").forEach(cell => cell.addEventListener("click", () => {
+    const photo = photos.find(p => p.id === cell.dataset.photoId);
+    openPhotoViewer(photo);
+  }));
+}
+
+function openPhotoViewer(photo) {
+  const html = `
+    <img src="${photo.dataUrl}" style="width:100%;border-radius:var(--radius-md);margin-bottom:14px">
+    <p class="card-sub">${formatShortDate(photo.date)}</p>
+    <button class="btn btn-secondary danger" id="btn-delete-photo">Delete photo</button>
+    <button class="btn btn-secondary" id="btn-close-photo" style="margin-top:10px">Close</button>
+  `;
+  const sheet = openSheet("Progress photo", html);
+  sheet.querySelector("#btn-close-photo").addEventListener("click", () => closeSheet(sheet));
+  sheet.querySelector("#btn-delete-photo").addEventListener("click", () => {
+    if (confirm("Delete this photo? This cannot be undone.")) {
+      Store.deletePhoto(photo.id);
+      closeSheet(sheet);
+      renderPhotoGrid();
+    }
+  });
+}
 
 function renderTrackingHistory(entries) {
   const wrap = document.getElementById("tk-history");

@@ -62,21 +62,31 @@ From then on, opening the site asks for the current code from your app. If you e
 
 **To change what/when it reminds you:** edit `data/schedule.json` directly (times are 24-hour, in your timezone as set by the `timezone` field) and commit. This file is intentionally separate from your day-to-day tracked data — it's your recurring weekly plan, not your log.
 
+**Two-way commands.** Text the bot directly (same chat as the reminders) and it'll act on it within 10 minutes:
+- `weight 89.4` — logs today's weigh-in (same as filling in Tracking → Weight in the app)
+- `done` — marks every exercise in today's program as done
+
+This only works if you've connected **Settings → Cloud sync** in the app at least once (see the Cloud sync section above) — commands are written to the same `data/user-data.json` file cloud sync uses, so they show up next time the app syncs, on any device. Messages from anyone other than your own chat ID are ignored.
+
 ---
 
 ## 5. Project structure
 
 ```
 index.html                          — app shell + lock screen markup
+manifest.json                       — Add to Home Screen icon/name config
+icons/                              — app icon (180/192/512px)
 css/styles.css                      — iOS-style design system
 js/data.js                          — seed content: groceries, recipes, supplements, training program
+js/exercise-guides.js               — beginner how-to text + animated diagrams per exercise
 js/store.js                         — localStorage data layer + export/import
 js/sync.js                          — optional GitHub-backed cross-device sync
 js/auth.js                          — TOTP lock implementation
 js/app.js                           — navigation + all six views
 data/schedule.json                  — recurring weekly schedule read by the Telegram bot
 scripts/send-reminders.js           — sends due Telegram reminders
-.github/workflows/telegram-reminders.yml — runs the script every 10 minutes
+scripts/handle-telegram-commands.js — handles "weight X" / "done" replies from Telegram
+.github/workflows/telegram-reminders.yml — runs both scripts every 10 minutes
 ```
 
 No build step, no dependencies to install for the web app itself — it's plain HTML/CSS/JS. Edit and push; GitHub Pages picks it up automatically.
@@ -87,10 +97,7 @@ No build step, no dependencies to install for the web app itself — it's plain 
 
 Since you mentioned wanting to build this out further, a few natural next steps, roughly in order of how much they'd unlock:
 
-- **QR code for lock setup** — faster than typing the key manually.
 - **Editable training program** from within the app, instead of editing `js/data.js` by hand.
-- **Telegram two-way commands** — e.g. text the bot "done" to tick off today's workout, or "weight 89.4" to log a weigh-in, instead of only receiving reminders.
 - **Grocery price history chart** — you're already logging price history per item; plotting it over time is a small addition once you've got a few weeks of data.
-- **Photo log** for the monthly progress photos mentioned in your original plan.
 
 Tell me which of these you want next and I'll build it.

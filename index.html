@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F2F2F7">
 <title>Arms Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -20,6 +23,8 @@
     <div id="lock-setup" class="lock-mode hidden">
       <h1 class="lock-title">Set up your lock</h1>
       <p class="lock-sub">Scan or enter this key into Google Authenticator, Authy, or any TOTP app. It's generated in your browser and never leaves this device.</p>
+      <div class="qr-box" id="qr-code"></div>
+      <p class="lock-sub small">Or enter this key manually:</p>
       <div class="secret-box" id="secret-display">—</div>
       <button class="btn btn-secondary" id="btn-copy-secret" type="button">Copy key</button>
       <p class="lock-sub small">Once it's added, enter the 6-digit code your app shows to confirm setup.</p>
@@ -131,6 +136,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/exercise-guides.js"></script>
 <script src="js/store.js"></script>
