@@ -311,6 +311,7 @@ VIEW_RENDERERS.training = function renderTraining() {
           program.exercises.map(ex => `<div class="check-row">
             <div class="checkbox ${dayLog.exercises[ex.id] ? "checked" : ""}" data-toggle-ex="${dateStr}|${ex.id}">${dayLog.exercises[ex.id] ? "✓" : ""}</div>
             <div class="check-row-text ${dayLog.exercises[ex.id] ? "done" : ""}">${escapeHtml(ex.name)}<div class="sub">${ex.sets}</div></div>
+            <button class="guide-btn" type="button" data-guide="${escapeHtml(ex.name)}" aria-label="How to do this exercise">ⓘ</button>
           </div>`).join("")}
       </div>
     </div>`;
@@ -328,7 +329,31 @@ VIEW_RENDERERS.training = function renderTraining() {
     Store.toggleExercise(dateStr, exId);
     VIEW_RENDERERS.training();
   }));
+  el.querySelectorAll("[data-guide]").forEach(btn => btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    showExerciseGuide(btn.dataset.guide);
+  }));
 };
+
+function showExerciseGuide(name) {
+  const guide = EXERCISE_GUIDES[name];
+  if (!guide) { toast("No guide for this one yet"); return; }
+  const svg = PATTERN_SVGS[guide.pattern] || "";
+  const html = `
+    <div class="guide-svg-wrap">${svg}</div>
+    <p class="guide-muscles">${escapeHtml(guide.muscles)}</p>
+    <div class="guide-block">
+      <h3>Setup</h3>
+      <p>${escapeHtml(guide.setup)}</p>
+    </div>
+    <div class="guide-block">
+      <h3>How to do it</h3>
+      <ul>${guide.cues.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
+    </div>
+    <div class="guide-tip">💡 ${escapeHtml(guide.tip)}</div>
+  `;
+  openSheet(name, html);
+}
 
 /* ============ RECIPES ============ */
 VIEW_RENDERERS.recipes = function renderRecipes() {
