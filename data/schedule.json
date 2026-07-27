@@ -1,0 +1,20 @@
+{
+  "timezone": "Australia/Melbourne",
+  "meals": [
+    { "time": "07:00", "label": "Breakfast", "detail": "Protein oats & banana — 60g oats, 300ml milk, 1 scoop protein, 1 banana" },
+    { "time": "10:00", "label": "Snack 1", "detail": "Protein yogurt + a small handful of almonds" },
+    { "time": "12:30", "label": "Lunch", "detail": "Protein + rice/pasta + veg — check the Recipes tab for today's option" },
+    { "time": "15:30", "label": "Snack 2", "detail": "Protein oat bar or another yogurt" },
+    { "time": "18:30", "label": "Dinner", "detail": "Mince or chicken + potato/rice + veg — check the Recipes tab" }
+  ],
+  "trainingTime": "17:30",
+  "training": {
+    "Monday": "Push — Chest, Shoulders, Triceps",
+    "Tuesday": "Pull — Back, Biceps",
+    "Wednesday": "Legs, Core + Conditioning",
+    "Thursday": "Arm Specialization",
+    "Friday": "Full Body + Conditioning",
+    "Saturday": "Rest day",
+    "Sunday": "Rest day"
+  }
+}

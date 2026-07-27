@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F2F2F7">
+<title>Arms Tracker</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ===== LOCK SCREEN ===== -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+
+    <!-- First-run setup -->
+    <div id="lock-setup" class="lock-mode hidden">
+      <h1 class="lock-title">Set up your lock</h1>
+      <p class="lock-sub">Scan or enter this key into Google Authenticator, Authy, or any TOTP app. It's generated in your browser and never leaves this device.</p>
+      <div class="secret-box" id="secret-display">—</div>
+      <button class="btn btn-secondary" id="btn-copy-secret" type="button">Copy key</button>
+      <p class="lock-sub small">Once it's added, enter the 6-digit code your app shows to confirm setup.</p>
+      <div class="otp-inputs" id="setup-otp-inputs"></div>
+      <p class="lock-error" id="setup-error"></p>
+      <button class="btn btn-primary" id="btn-confirm-setup" type="button">Confirm & lock this app</button>
+    </div>
+
+    <!-- Returning visitor -->
+    <div id="lock-verify" class="lock-mode hidden">
+      <h1 class="lock-title">Enter your code</h1>
+      <p class="lock-sub">Open your authenticator app for the current 6-digit code.</p>
+      <div class="otp-inputs" id="verify-otp-inputs"></div>
+      <p class="lock-error" id="verify-error"></p>
+      <button class="btn btn-link" id="btn-reset-lock" type="button">Lost your authenticator? Reset lock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" class="hidden">
+
+  <header class="topbar">
+    <h1 class="topbar-title" id="topbar-title">Groceries</h1>
+    <button class="topbar-action" id="btn-settings" aria-label="Settings">⚙️</button>
+  </header>
+
+  <main id="main">
+    <section class="view" id="view-groceries"></section>
+    <section class="view" id="view-training"></section>
+    <section class="view" id="view-recipes"></section>
+    <section class="view" id="view-supplements"></section>
+    <section class="view" id="view-tracking"></section>
+    <section class="view" id="view-calendar"></section>
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab-btn" data-view="groceries">
+      <svg viewBox="0 0 24 24" class="tab-icon"><path d="M6 6h15l-1.5 9h-12L6 6zm0 0L5 3H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="20" r="1.4" fill="currentColor"/><circle cx="17.5" cy="20" r="1.4" fill="currentColor"/></svg>
+      <span>Groceries</span>
+    </button>
+    <button class="tab-btn" data-view="training">
+      <svg viewBox="0 0 24 24" class="tab-icon"><path d="M4 12h2M18 12h2M6 8v8M18 8v8M8 12h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="9.5" width="2.5" height="5" rx="1" fill="currentColor"/><rect x="19" y="9.5" width="2.5" height="5" rx="1" fill="currentColor"/></svg>
+      <span>Training</span>
+    </button>
+    <button class="tab-btn" data-view="recipes">
+      <svg viewBox="0 0 24 24" class="tab-icon"><path d="M6 2v9a2 2 0 002 2v9M6 2v6M9 2v6M6 8h3M15 2c-1.7 0-3 2-3 5s1.3 5 3 5v9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Recipes</span>
+    </button>
+    <button class="tab-btn" data-view="supplements">
+      <svg viewBox="0 0 24 24" class="tab-icon"><rect x="3" y="9" width="18" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" transform="rotate(-30 12 13)"/><path d="M12 13L8 9" stroke="currentColor" stroke-width="1.8" transform="rotate(-30 12 13)"/></svg>
+      <span>Supplements</span>
+    </button>
+    <button class="tab-btn" data-view="tracking">
+      <svg viewBox="0 0 24 24" class="tab-icon"><path d="M4 20V10M11 20V4M18 20v-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Tracking</span>
+    </button>
+    <button class="tab-btn" data-view="calendar">
+      <svg viewBox="0 0 24 24" class="tab-icon"><rect x="3" y="4.5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Calendar</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ===== SETTINGS SHEET ===== -->
+<div id="settings-sheet" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 class="sheet-title">Settings</h2>
+    <div class="list-group">
+      <button class="list-row" id="btn-export">
+        <span>Export all data (backup)</span><span class="chev">›</span>
+      </button>
+      <label class="list-row" for="import-file">
+        <span>Import data from backup</span><span class="chev">›</span>
+      </label>
+      <input type="file" id="import-file" accept="application/json" class="hidden">
+      <button class="list-row danger" id="btn-clear-data">
+        <span>Erase all tracked data</span>
+      </button>
+    </div>
+    <button class="btn btn-secondary" id="btn-close-settings" style="margin-top:16px">Close</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
