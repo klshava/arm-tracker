@@ -73,6 +73,20 @@ const Store = (() => {
     set(KEYS.supplementLog, log);
     return log[dateStr];
   }
+  function addSupplement(sup) {
+    const list = getSupplements();
+    sup.id = "s" + Date.now();
+    list.push(sup);
+    set(KEYS.supplements, list);
+    return sup;
+  }
+  function deleteSupplement(id) {
+    set(KEYS.supplements, getSupplements().filter(s => s.id !== id));
+    // Also drop it from any day's log so old entries don't reference a deleted supplement.
+    const log = getSupplementLog();
+    Object.keys(log).forEach(date => { log[date] = log[date].filter(sid => sid !== id); });
+    set(KEYS.supplementLog, log);
+  }
 
   // ---- Training ----
   const getTrainingLog = () => get(KEYS.trainingLog, {});
@@ -171,7 +185,7 @@ const Store = (() => {
     KEYS, ensureSeeded,
     getGroceries, saveGroceries, addGrocery, logPrice, deleteGrocery,
     getRecipes,
-    getSupplements, getSupplementLog, toggleSupplement,
+    getSupplements, getSupplementLog, toggleSupplement, addSupplement, deleteSupplement,
     getTrainingLog, toggleExercise, setDayDone, setExerciseDone, logExerciseSet, getLastExerciseSet,
     getTrackingEntries, addTrackingEntry, deleteTrackingEntry,
     getPhotos, addPhoto, deletePhoto,

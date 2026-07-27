@@ -503,15 +503,61 @@ VIEW_RENDERERS.supplements = function renderSupplements() {
     html += `<div class="check-row">
       <div class="checkbox ${done ? "checked" : ""}" data-toggle-sup="${s.id}">${done ? "✓" : ""}</div>
       <div class="check-row-text ${done ? "done" : ""}">${escapeHtml(s.name)}<div class="sub">${escapeHtml(s.timing)}</div></div>
+      <button class="guide-btn" type="button" data-manage-sup="${s.id}" aria-label="Edit or remove this supplement">⋯</button>
     </div>`;
   });
-  html += `</div>`;
+  html += `</div>
+    <button class="btn btn-secondary" id="btn-add-supplement" style="margin-top:16px">+ Add supplement</button>`;
   el.innerHTML = html;
   el.querySelectorAll("[data-toggle-sup]").forEach(cb => cb.addEventListener("click", () => {
     Store.toggleSupplement(date, cb.dataset.toggleSup);
     VIEW_RENDERERS.supplements();
   }));
+  el.querySelectorAll("[data-manage-sup]").forEach(btn => btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openManageSupplementSheet(btn.dataset.manageSup);
+  }));
+  document.getElementById("btn-add-supplement").addEventListener("click", openAddSupplementSheet);
 };
+
+function openAddSupplementSheet() {
+  const body = `
+    <div class="field"><label>Name</label><input type="text" id="as-name" placeholder="e.g. Fish oil"></div>
+    <div class="field"><label>Timing</label><input type="text" id="as-timing" placeholder="e.g. Evening, with food"></div>
+    <div class="field"><label>Note (optional)</label><input type="text" id="as-note" placeholder="e.g. Helps joint recovery"></div>
+    <button class="btn btn-primary" id="as-save">Add supplement</button>
+  `;
+  const sheet = openSheet("Add supplement", body);
+  sheet.querySelector("#as-save").addEventListener("click", () => {
+    const name = sheet.querySelector("#as-name").value.trim();
+    const timing = sheet.querySelector("#as-timing").value.trim();
+    if (!name || !timing) { toast("Add a name and timing"); return; }
+    Store.addSupplement({ name, timing, note: sheet.querySelector("#as-note").value.trim() || "" });
+    closeSheet(sheet);
+    VIEW_RENDERERS.supplements();
+    toast("Supplement added");
+  });
+}
+
+function openManageSupplementSheet(id) {
+  const sup = Store.getSupplements().find(s => s.id === id);
+  if (!sup) return;
+  const body = `
+    <p class="card-sub">${escapeHtml(sup.timing)}${sup.note ? ` — ${escapeHtml(sup.note)}` : ""}</p>
+    <button class="btn btn-secondary danger" id="ms-delete">Remove supplement</button>
+    <button class="btn btn-secondary" id="ms-close" style="margin-top:10px">Close</button>
+  `;
+  const sheet = openSheet(sup.name, body);
+  sheet.querySelector("#ms-close").addEventListener("click", () => closeSheet(sheet));
+  sheet.querySelector("#ms-delete").addEventListener("click", () => {
+    if (confirm(`Remove "${sup.name}" from your supplements? This also clears it from past days you logged it.`)) {
+      Store.deleteSupplement(id);
+      closeSheet(sheet);
+      VIEW_RENDERERS.supplements();
+      toast("Supplement removed");
+    }
+  });
+}
 
 function computeSupplementStreak() {
   const sups = Store.getSupplements();
