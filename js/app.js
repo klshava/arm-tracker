@@ -351,8 +351,10 @@ function showExerciseGuide(name) {
       <ul>${guide.cues.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
     </div>
     <div class="guide-tip">💡 ${escapeHtml(guide.tip)}</div>
+    <button class="btn btn-secondary" id="btn-close-guide" style="margin-top:16px">Close</button>
   `;
-  openSheet(name, html);
+  const sheet = openSheet(name, html);
+  sheet.querySelector("#btn-close-guide").addEventListener("click", () => closeSheet(sheet));
 }
 
 /* ============ RECIPES ============ */
