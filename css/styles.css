@@ -85,6 +85,7 @@ input, textarea, select { font-family: inherit; }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-secondary { background: rgba(120,120,128,0.24); color: #fff; }
 .btn-link { background: transparent; color: var(--blue); font-weight: 500; font-size: 14px; padding: 8px; }
+.btn.danger { color: var(--red); }
 
 /* ============ App shell ============ */
 #app { min-height: 100%; padding-bottom: calc(64px + var(--safe-bottom)); }

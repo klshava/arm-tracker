@@ -10,6 +10,8 @@ const Store = (() => {
     trackingEntries: "att_tracking_entries" // [ {id,date,weight,bicepL,bicepR,waist,notes} ]
   };
 
+  let suppressSync = false;
+
   function get(key, fallback) {
     try {
       const raw = localStorage.getItem(key);
@@ -18,6 +20,7 @@ const Store = (() => {
   }
   function set(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+    if (!suppressSync && window.Sync) Sync.scheduleFlush();
   }
 
   function ensureSeeded() {
@@ -107,9 +110,11 @@ const Store = (() => {
     return dump;
   }
   function importAll(obj) {
+    suppressSync = true;
     Object.values(KEYS).forEach(k => {
       if (obj[k] !== undefined) set(k, obj[k]);
     });
+    suppressSync = false;
   }
   function clearAllData() {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));

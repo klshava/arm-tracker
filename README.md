@@ -8,11 +8,19 @@ A mobile-first, iOS-styled personal tracker for your training program: Groceries
 
 Two honest things worth knowing before you deploy:
 
-**Data storage.** GitHub Pages only serves static files — there's no database. Everything you log (weight, prices, checkboxes) is saved in your phone/browser's local storage. That means:
+**Data storage.** GitHub Pages only serves static files — there's no database. By default, everything you log (weight, prices, checkboxes) is saved in your phone/browser's local storage:
 - It's fast and needs no setup.
-- It does **not** sync between devices (e.g. logging on your phone won't show up on a laptop) — it's per-browser.
+- It does **not** sync between devices on its own (e.g. logging on your phone won't show up on a laptop) — it's per-browser.
 - Clearing your browser's site data would erase it. **Use Settings → Export all data** every so often to download a backup JSON file, and **Import** it if you ever switch devices or browsers.
-- Cross-device sync is possible as a future upgrade (e.g. storing data as JSON files in this repo via the GitHub API, or a small backend) — say the word when you want that built.
+
+**Cross-device sync (optional).** Settings → Cloud sync lets you connect the app to a `data/user-data.json` file stored right in this GitHub repo, read and written through the GitHub API. Once connected on a device, every change there is pushed (debounced ~4s after your last edit) and pulled on load, so your phone and laptop see the same log. To turn it on:
+1. Go to [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new).
+2. Under **Repository access**, choose "Only select repositories" → this repo (`arm-tracker`).
+3. Under **Permissions → Repository permissions**, set **Contents** to **Read and write**. Leave everything else as-is.
+4. Generate the token, copy it, and paste it into Settings → Cloud sync → Connect in the app. Repeat on each device you want synced.
+5. The token is stored only in that browser's local storage — it's never written into the code or the repo, same as the lock screen's secret.
+
+This is last-write-wins: if you edit on two devices while offline at the same time, whichever syncs last overwrites the other. Fine for one person on 1-2 devices; not built for concurrent multi-user editing.
 
 **The lock screen.** This is real TOTP (the same rotating-code system as Google Authenticator), verified with the Web Crypto API. The secret key is generated in your browser on first run and saved only to that browser's local storage — it's never written into the code or the repo. That means nothing sensitive shows up if someone views the page source. What it can't do is stop someone who's determined enough to read the app's logic and try to reverse-engineer it — no fully static, public site can promise that. What it does do is exactly what you asked for: stop someone who stumbles on the link from seeing anything.
 
@@ -63,6 +71,7 @@ index.html                          — app shell + lock screen markup
 css/styles.css                      — iOS-style design system
 js/data.js                          — seed content: groceries, recipes, supplements, training program
 js/store.js                         — localStorage data layer + export/import
+js/sync.js                          — optional GitHub-backed cross-device sync
 js/auth.js                          — TOTP lock implementation
 js/app.js                           — navigation + all six views
 data/schedule.json                  — recurring weekly schedule read by the Telegram bot
@@ -78,7 +87,6 @@ No build step, no dependencies to install for the web app itself — it's plain 
 
 Since you mentioned wanting to build this out further, a few natural next steps, roughly in order of how much they'd unlock:
 
-- **Cross-device sync** — store data as JSON in this repo via the GitHub API (using a fine-grained personal access token you generate and paste in once), so your phone and laptop see the same log.
 - **QR code for lock setup** — faster than typing the key manually.
 - **Editable training program** from within the app, instead of editing `js/data.js` by hand.
 - **Telegram two-way commands** — e.g. text the bot "done" to tick off today's workout, or "weight 89.4" to log a weigh-in, instead of only receiving reminders.

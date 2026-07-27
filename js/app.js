@@ -32,7 +32,11 @@ function closeSheet(overlay) { overlay.remove(); }
 document.addEventListener("DOMContentLoaded", initLock);
 
 function initLock() {
-  if (Auth.hasSecret() && Auth.isUnlockedThisSession()) { boot(); return; }
+  if (Auth.hasSecret() && Auth.isUnlockedThisSession()) {
+    document.getElementById("lock-screen").classList.add("hidden");
+    boot();
+    return;
+  }
   document.getElementById("lock-screen").classList.remove("hidden");
   Auth.hasSecret() ? showVerify() : showSetup();
 }
@@ -88,8 +92,11 @@ function showVerify() {
 }
 
 /* ============ App boot & navigation ============ */
-function boot() {
+async function boot() {
   Store.ensureSeeded();
+  if (Sync.isConnected()) {
+    try { await Sync.loadFromRemote(); } catch (e) { toast("Sync: " + e.message); }
+  }
   document.getElementById("app").classList.remove("hidden");
   document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
   wireSettings();
@@ -111,6 +118,7 @@ function wireSettings() {
   const sheet = document.getElementById("settings-sheet");
   document.getElementById("btn-settings").addEventListener("click", () => sheet.classList.remove("hidden"));
   document.getElementById("btn-close-settings").addEventListener("click", () => sheet.classList.add("hidden"));
+  wireSync();
   document.getElementById("btn-export").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(Store.exportAll(), null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -135,6 +143,60 @@ function wireSettings() {
       toast("Data erased");
       sheet.classList.add("hidden");
       showView("groceries");
+    }
+  });
+}
+
+function wireSync() {
+  const statusEl = document.getElementById("sync-status");
+  const connectForm = document.getElementById("sync-connect-form");
+  const connectedActions = document.getElementById("sync-connected-actions");
+  const tokenInput = document.getElementById("gh-pat-input");
+
+  function refreshUI(statusText) {
+    const connected = Sync.isConnected();
+    connectForm.classList.toggle("hidden", connected);
+    connectedActions.classList.toggle("hidden", !connected);
+    statusEl.textContent = statusText || (connected ? "Connected — synced across your devices." : "Not connected — data stays on this device only.");
+  }
+  refreshUI();
+
+  window.addEventListener("sync-start", () => { statusEl.textContent = "Syncing…"; });
+  window.addEventListener("sync-done", () => { statusEl.textContent = "Synced just now."; });
+  window.addEventListener("sync-error", (e) => { statusEl.textContent = "Sync error: " + e.detail; });
+
+  document.getElementById("btn-gh-connect").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    if (!token) return;
+    statusEl.textContent = "Connecting…";
+    try {
+      await Sync.connect(token);
+      tokenInput.value = "";
+      refreshUI("Connected — synced across your devices.");
+      toast("Cloud sync connected");
+      showView(document.querySelector(".tab-btn.active")?.dataset.view || "groceries");
+    } catch (e) {
+      refreshUI("Connection failed: " + e.message);
+    }
+  });
+
+  document.getElementById("btn-gh-sync-now").addEventListener("click", async () => {
+    statusEl.textContent = "Syncing…";
+    try {
+      await Sync.loadFromRemote();
+      await Sync.flush();
+      refreshUI("Synced just now.");
+      showView(document.querySelector(".tab-btn.active")?.dataset.view || "groceries");
+    } catch (e) {
+      refreshUI("Sync error: " + e.message);
+    }
+  });
+
+  document.getElementById("btn-gh-disconnect").addEventListener("click", () => {
+    if (confirm("Disconnects this device from cloud sync. Your data on GitHub stays put; this device keeps its local copy. Continue?")) {
+      Sync.disconnect();
+      refreshUI();
+      toast("Disconnected");
     }
   });
 }
